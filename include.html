@@ -1,0 +1,22 @@
+<style>
+body {
+  max-width: 95%;
+  padding-left: 2px;
+  padding-right: 2px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+</style>
+
+<script>
+var lastModified;
+setInterval(() => {
+  fetch(window.location.href, { method: 'HEAD', cache: 'no-cache' })
+    .then(response => {
+      const lm = response.headers.get('Last-Modified');
+      if(!lastModified) lastModified = lm;
+      else if(lastModified != lm) location.reload();
+    })
+    .catch(err => console.error(err));
+}, 2000);
+</script>
