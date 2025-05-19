@@ -89,8 +89,8 @@ endfunc
 func s:send() abort
   if exists("b:flymark_tick") && b:flymark_tick == b:changedtick | return | endif
   let b:flymark_tick = b:changedtick
-  call ch_sendraw(s:job, json_encode(#{
-        \ markdown : getline(1, "$")->join("\n"),
-        \ directory : expand("%:p:h"),
-        \ }) .. "\n")
+  call ch_sendraw(s:job, json_encode([
+        \ getline(1, "$")->join("\n"),
+        \ expand("%:p:h"),
+        \ ]) .. "\n")
 endfunc

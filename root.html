@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>flymark</title>
+
+    <style>
+    html, body { background-color: lavender }
+    body { margin: 1em 2em }
+    h1 { border-bottom: 1px solid silver; }
+    h2 { border-bottom: 1px solid silver; }
+    th { border-top: 1px solid gray; border-bottom: 1px solid gray; }
+    tr:last-child td { border-bottom: 1px solid gray; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js" integrity="sha256-OMcKHnypGrQOLZ5uYBKYUacX7Rx9Ssu91Bv5UDeRz2g=" crossorigin="anonymous"></script>
+
+    <script>
+      let lastModified;
+      var md = window.markdownit();
+
+      function update() {
+        fetch(window.location.href + "?markdown")
+          .then(response => {
+            return response.text();
+          })
+          .then(text => {
+            document.body.innerHTML = md.render(text);
+          })
+          .catch(err => console.error(err));
+      };
+
+      setInterval(() => {
+        fetch(window.location.href, { method: "HEAD", cache: "no-cache" })
+          .then(response => {
+            return response.headers.get("Last-Modified");
+          })
+          .then(time => {
+            if(!lastModified || lastModified != time) {
+              lastModified = time;
+              update();
+            }
+          })
+          .catch(err => console.error(err));
+      }, 1000);
+    </script>
+  </head>
+  <body>
+  </body>
+</html>

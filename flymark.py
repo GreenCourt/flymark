@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import subprocess
 from datetime import datetime, UTC
 import argparse
-from shutil import which
 import urllib.parse
-import traceback
 import json
 from pathlib import Path
 from threading import Thread, Lock
@@ -15,38 +12,23 @@ lock = Lock()
 markdown: bytes = b"No content."
 directory: str = ""
 last_modified: datetime = datetime.now(UTC)
-content_type = {
+content_type: dict[str, str] = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".gif": "image/gif",
 }
 
+with open(Path(__file__).parent.joinpath("root.html")) as f:
+    root: bytes = f.read().encode("utf-8")
 
-def pandoc() -> bytes:
-    try:
-        with lock:
-            return subprocess.run(
-                [
-                    "pandoc",
-                    "-s",
-                    "-f",
-                    "gfm",
-                    "-t",
-                    "html",
-                    "--katex",
-                    "-H",
-                    Path(__file__).parent.joinpath("include.html"),
-                ],
-                input=markdown,
-                capture_output=True,
-                check=True,
-                timeout=5,
-            ).stdout
-    except subprocess.CalledProcessError as e:
-        return b"<pre>" + e.stderr + b"</pre>"
-    except Exception:
-        return ("<pre>" + traceback.format_exc() + "</pre>").encode("utf-8")
+
+def update(m: str, d: str):
+    global markdown, directory, last_modified
+    with lock:
+        last_modified = datetime.now(UTC)
+        markdown = m.encode("utf-8")
+        directory = d
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -60,10 +42,10 @@ class Handler(BaseHTTPRequestHandler):
                 directory,
                 urllib.parse.unquote(u.path[1:] if u.path[0] == "/" else u.path),
             )
-        return u.path, local_path
+        return u.path, local_path, u.query
 
     def do_HEAD(self):
-        url_path, local_path = self._parse_path()
+        url_path, local_path, _ = self._parse_path()
         fmt = "%a, %d %b %Y %H:%M:%S GMT"
 
         if url_path == "/":
@@ -81,10 +63,19 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        url_path, local_path = self._parse_path()
+        url_path, local_path, query = self._parse_path()
+
+        if query == "markdown":
+            with lock:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(markdown)))
+                self.end_headers()
+                self.wfile.write(markdown)
+            return
 
         if url_path == "/":
-            body = pandoc()
+            body = root
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -111,17 +102,9 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=0)
     args = parser.parse_args()
 
-    if which("pandoc") is None:
-        print("pandoc not found.", file=sys.stderr)
-        sys.exit(1)
-
     with HTTPServer((args.bind, args.port), Handler) as s:
         print(f"listening at {s.server_address[0]}:{s.server_address[1]}")
         Thread(target=s.serve_forever, daemon=True).start()
 
         for line in sys.stdin:
-            js = json.loads(line)
-            with lock:
-                last_modified = datetime.now(UTC)
-                markdown = js["markdown"].encode("utf-8")
-                directory = js["directory"]
+            update(*json.loads(line))
