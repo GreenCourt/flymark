@@ -17,7 +17,7 @@
 
     <script>
       let lastModified;
-      var md = window.markdownit();
+      const md = window.markdownit({ html: true, linkify: true });
 
       function update() {
         fetch(window.location.href + "?markdown")
